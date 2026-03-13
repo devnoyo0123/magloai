@@ -4,6 +4,9 @@
 # Personal files
 summaries/
 
+# OMC (oh-my-claudecode)
+.omc/
+
 # Python
 __pycache__/
 *.py[cod]
