@@ -264,8 +264,12 @@ if st.session_state.selected_summary:
     st.markdown("---")
     st.markdown(item['summary'])
 
-    col1, col2 = st.columns([1, 5])
+    col1, col2, col3 = st.columns([1, 1, 4])
     with col1:
+        if st.button("🏠 홈으로", type="primary"):
+            st.session_state.selected_summary = None
+            st.rerun()
+    with col2:
         if st.button("🗑️ 삭제", type="secondary"):
             try:
                 item['filepath'].unlink()
