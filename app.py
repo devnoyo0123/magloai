@@ -180,6 +180,13 @@ if not os.getenv("OPENROUTER_API_KEY"):
 with st.sidebar:
     st.markdown("### 📚 요약 히스토리")
 
+    # 홈 버튼 (요약 보기 중일 때만 표시)
+    if st.session_state.selected_summary:
+        if st.button("🏠 홈으로", type="primary", use_container_width=True):
+            st.session_state.selected_summary = None
+            st.rerun()
+        st.markdown("")
+
     summaries = load_summaries()
 
     if summaries:
@@ -264,20 +271,14 @@ if st.session_state.selected_summary:
     st.markdown("---")
     st.markdown(item['summary'])
 
-    col1, col2, col3 = st.columns([1, 1, 4])
-    with col1:
-        if st.button("🏠 홈으로", type="primary"):
+    if st.button("🗑️ 삭제", type="secondary"):
+        try:
+            item['filepath'].unlink()
+            st.success("삭제되었습니다!")
             st.session_state.selected_summary = None
             st.rerun()
-    with col2:
-        if st.button("🗑️ 삭제", type="secondary"):
-            try:
-                item['filepath'].unlink()
-                st.success("삭제되었습니다!")
-                st.session_state.selected_summary = None
-                st.rerun()
-            except Exception as e:
-                st.error(f"삭제 실패: {e}")
+        except Exception as e:
+            st.error(f"삭제 실패: {e}")
 
 else:
     # 탭으로 YouTube / 음성 파일 분리
