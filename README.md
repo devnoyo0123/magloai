@@ -58,6 +58,12 @@ cp .env.example .env
 # .env 파일을 열어서 OPENROUTER_API_KEY 입력
 ```
 
+## 미리보기
+
+![앱 스크린샷](screenshot.png)
+
+앱 실행 시 이렇게 표시됩니다.
+
 ## 사용 방법
 
 ### 1. 앱 실행
