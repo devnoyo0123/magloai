@@ -178,14 +178,14 @@ if not os.getenv("OPENROUTER_API_KEY"):
 
 # 사이드바
 with st.sidebar:
-    st.markdown("### 📚 요약 히스토리")
-
     # 홈 버튼 (요약 보기 중일 때만 표시)
     if st.session_state.selected_summary:
         if st.button("🏠 홈으로", type="primary", use_container_width=True):
             st.session_state.selected_summary = None
             st.rerun()
-        st.markdown("")
+        st.markdown("---")
+
+    st.markdown("### 📚 요약 히스토리")
 
     summaries = load_summaries()
 
