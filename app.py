@@ -1,6 +1,8 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import os
 import json
+import base64
 from datetime import datetime
 from pathlib import Path
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -16,6 +18,10 @@ load_dotenv()
 # 요약 저장 디렉토리
 SUMMARIES_DIR = Path("summaries")
 SUMMARIES_DIR.mkdir(exist_ok=True)
+
+# 음성 파일 저장 디렉토리
+AUDIO_FILES_DIR = SUMMARIES_DIR / "audio_files"
+AUDIO_FILES_DIR.mkdir(exist_ok=True)
 
 # OpenRouter 클라이언트 설정
 client = OpenAI(
@@ -69,13 +75,22 @@ def transcribe_audio(audio_file):
         # 음성 인식
         segments, info = model.transcribe(tmp_path, beam_size=5)
 
-        # 텍스트 추출
-        transcript_text = ' '.join([segment.text for segment in segments])
+        # 타임스탬프 포함하여 저장
+        segments_list = []
+        for segment in segments:
+            segments_list.append({
+                'start': segment.start,
+                'end': segment.end,
+                'text': segment.text
+            })
+
+        # 전체 텍스트 (기존 호환성 유지)
+        transcript_text = ' '.join([s['text'] for s in segments_list])
 
         # 임시 파일 삭제
         os.unlink(tmp_path)
 
-        return transcript_text, info
+        return transcript_text, info, segments_list
 
     except ImportError:
         raise Exception("faster-whisper가 설치되지 않았습니다. 'pip install faster-whisper'를 실행하세요.")
@@ -120,11 +135,104 @@ def summarize_and_translate(transcript):
     except Exception as e:
         raise Exception(f"요약 중 오류 발생: {str(e)}")
 
-def save_summary(source_id, source_url, summary, source_type="youtube"):
-    """요약을 JSON 파일로 저장"""
+def render_interactive_player(audio_path, segments):
+    """인터랙티브 플레이어"""
+    with open(audio_path, 'rb') as f:
+        audio_bytes = f.read()
+        audio_base64 = base64.b64encode(audio_bytes).decode()
+    
+    ext = Path(audio_path).suffix.lower()
+    mime_types = {'.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.flac': 'audio/flac', '.ogg': 'audio/ogg'}
+    mime_type = mime_types.get(ext, 'audio/mpeg')
+    
+    segments_html = ""
+    for i, seg in enumerate(segments):
+        start_time = seg['start']
+        minutes, seconds = int(start_time // 60), int(start_time % 60)
+        time_str = f"{minutes:02d}:{seconds:02d}"
+        text = seg['text'].strip()
+        segments_html += f'<div class="segment" id="segment-{i}"><button class="timestamp-btn" onclick="seekTo({start_time}, {i})">⏱️ {time_str}</button><p class="segment-text">{text}</p></div>'
+    
+    html_code = f"""<!DOCTYPE html><html><head><style>* {{margin:0;padding:0;box-sizing:border-box}}body {{font-family:sans-serif;background:#0e1117;color:#fafafa}}.container {{padding:20px;padding-bottom:140px}}.segment {{margin-bottom:15px;padding:15px;border-left:3px solid #4CAF50;background:#1e1e1e;border-radius:0 8px 8px 0;transition:all 0.2s}}.segment:hover {{background:#262626;transform:translateX(5px)}}.segment.active {{background:#2d3a2e;border-left-color:#81C784;box-shadow:0 0 20px rgba(76,175,80,0.2)}}.timestamp-btn {{background:linear-gradient(135deg,#4CAF50,#45a049);color:white;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600;margin-bottom:8px;transition:all 0.2s}}.timestamp-btn:hover {{background:linear-gradient(135deg,#66BB6A,#4CAF50);transform:translateY(-2px)}}.segment-text {{line-height:1.6;color:#e0e0e0}}.audio-panel {{position:fixed;bottom:0;left:0;right:0;background:#1e1e1e;padding:15px 20px;box-shadow:0 -4px 20px rgba(0,0,0,0.5);z-index:1000;border-top:2px solid #4CAF50}}.audio-controls {{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:20px}}audio {{flex:1;max-width:800px;border-radius:8px}}</style></head><body><div class="container">{segments_html}</div><div class="audio-panel"><div class="audio-controls"><audio id="audioPlayer" controls><source src="data:{mime_type};base64,{audio_base64}" type="{mime_type}"></audio></div></div><script>const audio=document.getElementById('audioPlayer');let currentSegmentIndex=-1;function seekTo(seconds,segmentIndex){{audio.currentTime=seconds;audio.play();highlightSegment(segmentIndex)}}function highlightSegment(index){{document.querySelectorAll('.segment').forEach(seg=>seg.classList.remove('active'));const segment=document.getElementById('segment-'+index);if(segment){{segment.classList.add('active');segment.scrollIntoView({{behavior:'smooth',block:'center'}});currentSegmentIndex=index}}}}audio.addEventListener('timeupdate',function(){{const current=audio.currentTime;const segments={json.dumps([{"start":s["start"],"end":s["end"]} for s in segments])};for(let i=0;i<segments.length;i++){{if(current>=segments[i].start&&current<segments[i].end){{if(currentSegmentIndex!==i)highlightSegment(i);break}}}}}});</script></body></html>"""
+    
+    components.html(html_code, height=700, scrolling=True)
+
+def merge_segments_into_paragraphs(segments, transcript_text):
+    """Whisper segments를 문단으로 병합"""
+    try:
+        if len(segments) < 5:
+            return segments
+        
+        # 전체 텍스트를 LLM에 전달 (자르지 않음!)
+        prompt = f"""다음 텍스트를 의미 있는 문단으로 나눠주세요.
+규칙:
+1. 각 문단은 하나의 주제/아이디어
+2. 각 문단은 2-4문장
+3. 원본 텍스트 그대로 사용
+4. 각 문단 사이에 "###PARAGRAPH###" 구분자
+5. 다른 설명 없이 문단만 출력
+
+텍스트:
+{transcript_text}"""
+        
+        model_name = os.getenv("MODEL_NAME", "google/gemini-2.5-flash-lite")
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=8000  # 충분히 큰 값
+        )
+        
+        paragraphs = [p.strip() for p in response.choices[0].message.content.strip().split("###PARAGRAPH###") if p.strip()]
+        
+        if not paragraphs or len(paragraphs) < 2:
+            st.warning("⚠️ 문단 분리 실패, 원본 segments 사용")
+            return segments
+        
+        # 각 문단의 시작 시간 찾기
+        paragraph_segments = []
+        for para in paragraphs:
+            para_words = ' '.join(para.strip().split()[:10]).lower()
+            found = False
+            for seg in segments:
+                if para_words[:30] in seg['text'].strip().lower() or seg['text'].strip().lower()[:30] in para_words:
+                    paragraph_segments.append({'start': seg['start'], 'end': seg['end'], 'text': para})
+                    found = True
+                    break
+            if not found and paragraph_segments:
+                prev_end = paragraph_segments[-1].get('end', 0)
+                paragraph_segments.append({'start': prev_end, 'end': prev_end + 30, 'text': para})
+            elif not found:
+                paragraph_segments.append({'start': 0, 'end': 30, 'text': para})
+        
+        # end 시간 보정
+        for i in range(len(paragraph_segments) - 1):
+            paragraph_segments[i]['end'] = paragraph_segments[i + 1]['start']
+        if paragraph_segments and segments:
+            paragraph_segments[-1]['end'] = segments[-1]['end']
+        
+        return paragraph_segments if len(paragraph_segments) > 0 else segments
+    
+    except Exception as e:
+        st.warning(f"문단 병합 실패, 원본 segments 사용: {str(e)}")
+        return segments
+
+
+def save_summary(source_id, source_url, summary, transcript=None, audio_file=None, segments=None, source_type="youtube"):
+    """요약, 전체 스크립트, 음성 파일, 타임스탬프를 저장"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{source_type}_{source_id}_{timestamp}.json"
     filepath = SUMMARIES_DIR / filename
+
+    # 음성 파일 저장 (음성 파일이 있는 경우)
+    audio_file_path = None
+    audio_file_absolute_path = None
+    if audio_file is not None:
+        audio_filename = f"{source_type}_{source_id}_{timestamp}{Path(audio_file.name).suffix}"
+        audio_file_absolute_path = AUDIO_FILES_DIR / audio_filename
+        with open(audio_file_absolute_path, 'wb') as f:
+            f.write(audio_file.getvalue())
+        # 상대 경로로 저장
+        audio_file_path = str(audio_file_absolute_path.relative_to(SUMMARIES_DIR.parent))
 
     data = {
         "source_type": source_type,
@@ -132,13 +240,16 @@ def save_summary(source_id, source_url, summary, source_type="youtube"):
         "source_url": source_url,
         "timestamp": datetime.now().isoformat(),
         "summary": summary,
+        "transcript": transcript,
+        "audio_file": audio_file_path,
+        "segments": segments,
         "model": os.getenv("MODEL_NAME", "nvidia/nemotron-3-super-120b-a12b:free")
     }
 
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-    return filepath
+    return filepath, audio_file_absolute_path
 
 def load_summaries():
     """저장된 요약 목록 불러오기"""
@@ -342,15 +453,28 @@ else:
                     file_id = uploaded_file.name.replace('.', '_')
 
                     with st.spinner("음성을 텍스트로 변환 중... (시간이 걸릴 수 있습니다)"):
-                        transcript, info = transcribe_audio(uploaded_file)
+                        transcript, info, segments = transcribe_audio(uploaded_file)
 
-                    st.success(f"✅ 음성 인식 완료 ({len(transcript)} 글자)")
-                    st.info(f"언어: {info.language}, 길이: {info.duration:.1f}초")
+                    st.success(f"✅ 음성 인식 완료 ({len(transcript)} 글자, 원본 세그먼트: {len(segments)}개)")
+
+                    # 문단 병합
+                    with st.spinner("💡 의미 있는 문단으로 정리 중..."):
+                        paragraph_segments = merge_segments_into_paragraphs(segments, transcript)
+
+                    st.info(f"언어: {info.language}, 길이: {info.duration:.1f}초, 문단: {len(paragraph_segments)}개")
 
                     with st.spinner("요약 및 번역 중..."):
                         summary = summarize_and_translate(transcript)
 
-                    save_summary(file_id, uploaded_file.name, summary, "audio")
+                    # 저장하고 오디오 파일 경로 받기
+                    _, saved_audio_path = save_summary(file_id, uploaded_file.name, summary, transcript=transcript, audio_file=uploaded_file, segments=paragraph_segments, source_type="audio")
+
+                    # 인터랙티브 플레이어 표시
+                    if saved_audio_path and len(paragraph_segments) > 0:
+                        st.markdown("---")
+                        st.markdown("### 🎧 인터랙티브 음성 플레이어")
+                        st.caption("⏱️ 타임스탬프를 클릭하면 해당 시점부터 재생됩니다")
+                        render_interactive_player(str(saved_audio_path), paragraph_segments)
 
                     st.markdown("---")
                     st.markdown("### 📝 요약 결과")
