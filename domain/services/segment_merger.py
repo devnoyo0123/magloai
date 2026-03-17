@@ -61,6 +61,9 @@ class SegmentMerger:
                     ParagraphSegment(start=0, end=30, text=para)
                 )
 
+        # Sort by start time to ensure chronological order
+        paragraph_segments.sort(key=lambda x: x.start)
+
         # Fix end times
         for i in range(len(paragraph_segments) - 1):
             paragraph_segments[i].end = paragraph_segments[i + 1].start
