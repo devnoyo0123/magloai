@@ -145,20 +145,43 @@ class StreamlitAdapter:
             with st.expander(
                 f"🎬 {summary.source_id} - {summary.timestamp.strftime('%Y-%m-%d %H:%M')}"
             ):
-                st.write("**요약:**")
+                # 메타데이터 정보
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.caption(f"📁 소스 타입: {summary.source_type}")
+                with col2:
+                    if summary.timestamp:
+                        st.caption(f"🕐 처리 시간: {summary.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
+                with col3:
+                    if summary.model:
+                        st.caption(f"🤖 모델: {summary.model[:50]}...")
+
+                if summary.source_url:
+                    st.caption(f"🔗 원본 URL: {summary.source_url}")
+
+                # 요약 섹션
+                st.subheader("📝 요약")
                 st.write(summary.summary_text)
 
+                # 전체 스크립트 섹션
                 if summary.transcript:
-                    st.write("**전체 스크립트:**")
-                    with st.expander("스크립트 보기"):
+                    st.subheader("📜 전체 스크립트")
+                    with st.expander("전체 스크립트 보기"):
                         st.text(summary.transcript)
 
+                # 인터랙티브 플레이어 섹션
                 if summary.audio_file_path and summary.segments:
                     audio_path = Path(summary.audio_file_path)
                     if audio_path.exists():
-                        st.write("**인터랙티브 플레이어:**")
+                        st.subheader("🎵 인터랙티브 음성 플레이어")
                         html_content = self.html_player.render(
                             audio_path=audio_path,
                             segments=summary.segments
                         )
                         components.html(html_content, height=600, scrolling=True)
+
+                # 저장 위치 정보
+                if summary.timestamp:
+                    json_filename = f"{summary.source_id}_{summary.timestamp.strftime('%Y%m%d_%H%M%S')}.json"
+                    json_path = Path("summaries") / json_filename
+                    st.info(f"저장 위치: {json_path}")

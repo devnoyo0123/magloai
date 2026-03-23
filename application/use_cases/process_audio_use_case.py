@@ -60,16 +60,12 @@ class ProcessAudioUseCase:
             summary_text=summary_text,
             transcript=full_text,
             segments=paragraph_segments,
-            audio_file_path=None,  # Will be set after save
+            audio_file_path=None,  # Will be set by repository during save
             timestamp=datetime.now(),
             model=str(info.all_language_probs) if hasattr(info, 'all_language_probs') else None
         )
 
-        # 6. Save to repository
+        # 6. Save to repository (repository will update audio_file_path)
         json_path, audio_path = self.repository.save(summary, audio_file_path)
-
-        # Update audio path in summary
-        if audio_path:
-            summary.audio_file_path = str(audio_path)
 
         return summary, json_path, audio_path

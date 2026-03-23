@@ -23,19 +23,21 @@ class FileSystemAdapter(SummaryRepositoryPort):
         audio_file: Optional[object] = None
     ) -> Tuple[Path, Optional[Path]]:
         """Save summary and optional audio file."""
-        # Save JSON
-        json_filename = f"{summary.source_id}_{summary.timestamp.strftime('%Y%m%d_%H%M%S')}.json"
-        json_path = self.summaries_dir / json_filename
-
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(summary.to_dict(), f, ensure_ascii=False, indent=2)
-
-        # Save audio file if provided
+        # Save audio file first if provided
         audio_path = None
         if audio_file is not None:
             audio_filename = f"{summary.source_id}_{summary.timestamp.strftime('%Y%m%d_%H%M%S')}.mp3"
             audio_path = self.audio_dir / audio_filename
             shutil.copy(audio_file, audio_path)
+            # Update summary with audio path before saving JSON
+            summary.audio_file_path = str(audio_path)
+
+        # Save JSON with complete data
+        json_filename = f"{summary.source_id}_{summary.timestamp.strftime('%Y%m%d_%H%M%S')}.json"
+        json_path = self.summaries_dir / json_filename
+
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(summary.to_dict(), f, ensure_ascii=False, indent=2)
 
         return json_path, audio_path
 

@@ -46,22 +46,31 @@ class HTMLPlayerAdapter:
                 margin: 5px 0;
                 cursor: pointer;
                 border-radius: 5px;
-                transition: background-color 0.2s;
+                transition: all 0.2s;
             }}
             .segment:hover {{
                 background-color: #e3f2fd;
+            }}
+            .segment:hover .text {{
+                color: #1a1a1a;
             }}
             .segment.active {{
                 background-color: #bbdefb;
                 font-weight: bold;
             }}
+            .segment.active .text {{
+                color: #000;
+            }}
             .timestamp {{
-                color: #1976d2;
+                color: #64b5f6;
                 font-weight: bold;
                 margin-right: 10px;
             }}
+            .segment.active .timestamp {{
+                color: #1976d2;
+            }}
             .text {{
-                color: #333;
+                color: #e0e0e0;
             }}
         </style>
 
@@ -77,7 +86,9 @@ class HTMLPlayerAdapter:
 
             function updateActiveSegment(index) {{
                 document.querySelectorAll('.segment').forEach(seg => seg.classList.remove('active'));
-                document.getElementById('seg-' + index).classList.add('active');
+                const activeSegment = document.getElementById('seg-' + index);
+                activeSegment.classList.add('active');
+                activeSegment.scrollIntoView({{ behavior: 'smooth', block: 'nearest' }});
             }}
 
             audio.addEventListener('timeupdate', () => {{
