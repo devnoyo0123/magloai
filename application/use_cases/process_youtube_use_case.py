@@ -22,24 +22,23 @@ class ProcessYoutubeUseCase:
         self.repository = repository
 
     def execute(self, youtube_url: str) -> Tuple[Summary, Path]:
-        """
-        Process YouTube video: extract transcript, summarize, and save.
-
-        Returns:
-            Tuple of (Summary, json_path)
-        """
         # 1. Extract video ID
         video_id = self.youtube_adapter.extract_video_id(youtube_url)
 
-        # 2. Get transcript
+        # 2. Get video title
+        title = self.youtube_adapter.get_video_title(video_id)
+        sanitized_title = self.youtube_adapter.sanitize_filename(title)
+        source_id = f"{video_id}_{sanitized_title}"
+
+        # 3. Get transcript
         transcript = self.youtube_adapter.get_transcript(video_id)
 
-        # 3. Summarize
+        # 4. Summarize
         summary_text = self.summarization.summarize(transcript)
 
-        # 4. Create domain model
+        # 5. Create domain model
         summary = Summary(
-            source_id=video_id,
+            source_id=source_id,
             source_url=youtube_url,
             source_type="youtube",
             summary_text=summary_text,
@@ -50,7 +49,7 @@ class ProcessYoutubeUseCase:
             model=None
         )
 
-        # 5. Save to repository
+        # 6. Save to repository
         json_path, _ = self.repository.save(summary, audio_file=None)
 
         return summary, json_path

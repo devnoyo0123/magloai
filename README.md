@@ -1,13 +1,32 @@
-# YouTube 자막 요약기
+# 음성 인식 및 요약 서비스
 
-YouTube 영상의 영어 자막을 추출하여 한국어로 요약해주는 Streamlit 앱입니다.
+YouTube 영상 자막 추출, 음성 파일 변환, AI 요약, 스크립트 기반 채팅 Q&A를 제공하는 Streamlit 앱입니다.
 
 ## 기능
 
-- YouTube URL 입력으로 자동 자막 추출
-- AI를 활용한 요약 및 한국어 번역
-- 깔끔한 웹 인터페이스
-- 저비용 운영 (Gemini 2.0 Flash 무료 모델 사용)
+### 📤 음성 파일 업로드
+- 음성 파일(mp3, wav, m4a, ogg) 업로드 → 텍스트 변환(faster-whisper) → AI 요약
+
+### 🎬 YouTube
+- YouTube URL 입력 → 영어 자막 자동 추출 → 한국어 요약
+
+### 📋 저장된 요약
+- 처리 완료된 요약본 목록 조회 (요약, 스크립트, 메타데이터)
+
+### 💬 채팅 Q&A
+- 처리된 영상/음성의 스크립트를 기반으로 질문-답변
+- 스크립트에 없는 내용은 추측하지 않고 정확한 인용으로 답변
+- 대화 내역 유지 (초기화 가능)
+
+## 비용
+
+| 기능 | 모델 | 비용 |
+|------|------|------|
+| 음성→텍스트 | faster-whisper (로컬) | 무료 |
+| 요약 | gpt-4o-mini (OpenRouter) | 건당 ~$0.001 |
+| 채팅 Q&A | nvidia/nemotron (OpenRouter) | 무료 |
+
+**거의 무료**로 사용 가능합니다. 요약만 건당 약 0.1원 수준입니다.
 
 ## 설치 방법
 
@@ -20,13 +39,9 @@ cd magloai
 # macOS/Linux:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 또는 Homebrew:
-# brew install uv
-
-# 가상환경 생성 및 패키지 설치 (한 번에!)
+# 가상환경 생성 및 패키지 설치
 uv venv
 source .venv/bin/activate  # macOS/Linux
-# .venv\Scripts\activate   # Windows
 
 uv pip install -r requirements.txt
 ```
@@ -36,20 +51,15 @@ uv pip install -r requirements.txt
 ```bash
 cd magloai
 
-# 가상환경 생성
 python -m venv venv
-
-# 가상환경 활성화
 source venv/bin/activate  # macOS/Linux
-# venv\Scripts\activate   # Windows
 
-# 패키지 설치
 pip install -r requirements.txt
 ```
 
-### 3. API 키 설정
+### API 키 설정
 
-1. [OpenRouter](https://openrouter.ai/keys)에서 무료 API 키 발급
+1. [OpenRouter](https://openrouter.ai/keys)에서 API 키 발급
 2. `.env.example` 파일을 `.env`로 복사
 3. `.env` 파일에 API 키 입력
 
@@ -58,57 +68,33 @@ cp .env.example .env
 # .env 파일을 열어서 OPENROUTER_API_KEY 입력
 ```
 
-## 미리보기
-
-![앱 스크린샷](screenshot.png)
-
-앱 실행 시 이렇게 표시됩니다.
-
 ## 사용 방법
-
-### 1. 앱 실행
 
 ```bash
 streamlit run app.py
 ```
 
-### 2. 브라우저에서 사용
-
-1. 자동으로 브라우저가 열립니다 (보통 http://localhost:8501)
-2. YouTube 영상 URL 입력
-3. "요약하기" 버튼 클릭
-4. 결과 확인
-
-## 지원 영상
-
-- 영어 자막이 있는 YouTube 영상
-- 자동 생성 자막 또는 수동 자막 모두 지원
+1. 브라우저가 자동으로 열립니다 (http://localhost:8501)
+2. 상단 라디오 버튼으로 기능 선택
+3. **YouTube**: URL 입력 → 처리 시작 → 요약/스크립트 확인
+4. **채팅**: 요약본 선택 → 스크립트 기반으로 질문 → AI 답변
 
 ## 기술 스택
 
-- **Frontend**: Streamlit
+- **UI**: Streamlit
+- **음성 인식**: faster-whisper (로컬 CPU)
 - **자막 추출**: youtube-transcript-api
-- **AI 요약/번역**: OpenRouter (Gemini 2.0 Flash)
+- **AI 요약**: OpenRouter (gpt-4o-mini)
+- **AI 채팅**: OpenRouter (nvidia/nemotron 무료 모델)
 - **언어**: Python 3.8+
 
-## 예상 비용
+## 설정 (.env)
 
-- Gemini 2.0 Flash (무료 티어): $0/영상
-- OpenRouter 무료 할당량 내에서 무료 사용 가능
-
-## 문제 해결
-
-### "자막을 찾을 수 없습니다"
-- 해당 영상에 영어 자막이 없는 경우입니다
-- 자막 설정이 활성화된 다른 영상을 시도해보세요
-
-### "OPENROUTER_API_KEY가 설정되지 않았습니다"
-- `.env` 파일이 있는지 확인
-- API 키가 올바르게 입력되었는지 확인
-
-### 처리 속도가 느림
-- Gemini Flash는 무료 모델이라 가끔 느릴 수 있습니다
-- 보통 30초~1분 정도 소요됩니다
+```bash
+OPENROUTER_API_KEY=sk-or-v1-...     # 필수
+WHISPER_MODEL=small                  # tiny, base, small, medium, large
+CHAT_MODEL_NAME=nvidia/nemotron-3-super-120b-a12b:free  # 채팅 모델
+```
 
 ---
 

@@ -30,3 +30,8 @@ class SummaryRepositoryPort(ABC):
     def load_all(self) -> List[Summary]:
         """Load all saved summaries."""
         pass
+
+    @abstractmethod
+    def delete(self, summary: Summary) -> None:
+        """Delete a saved summary file."""
+        pass

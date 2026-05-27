@@ -9,7 +9,7 @@ class OpenAIAdapter(SummarizationPort, TextSegmentationPort):
     """Adapter for OpenAI/OpenRouter API."""
 
     def __init__(self, api_key: str, base_url: str, model: str = "gpt-4o-mini"):
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=30.0)
         self.model = model
 
     def summarize(self, text: str) -> str:
@@ -21,6 +21,8 @@ class OpenAIAdapter(SummarizationPort, TextSegmentationPort):
                 {"role": "user", "content": f"다음 텍스트를 요약해주세요:\n\n{text}"}
             ]
         )
+        if not response.choices or not response.choices[0].message.content:
+            raise RuntimeError("요약 응답을 생성하지 못했습니다.")
         return response.choices[0].message.content
 
     def segment_text(self, text: str) -> List[str]:
@@ -48,6 +50,8 @@ class OpenAIAdapter(SummarizationPort, TextSegmentationPort):
             max_tokens=8000
         )
 
+        if not response.choices or not response.choices[0].message.content:
+            raise RuntimeError("문단 분할 응답을 생성하지 못했습니다.")
         result = response.choices[0].message.content
         paragraphs = [p.strip() for p in result.split("###PARAGRAPH###") if p.strip()]
         return paragraphs
