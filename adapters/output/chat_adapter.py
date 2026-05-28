@@ -8,7 +8,7 @@ class ChatAdapter(ChatPort):
     """Adapter for chat Q&A via OpenRouter (NVIDIA Nemotron free model)."""
 
     def __init__(self, api_key: str, base_url: str, model: str):
-        self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=30.0)
+        self.client = OpenAI(api_key=api_key, base_url=base_url, timeout=120.0)
         self.model = model
         self._history: List[Dict[str, str]] = []
 

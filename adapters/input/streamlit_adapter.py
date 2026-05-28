@@ -1,7 +1,6 @@
 """Streamlit UI adapter."""
 import logging
 import streamlit as st
-import streamlit.components.v1 as components
 from pathlib import Path
 from typing import Optional
 from application.use_cases.process_audio_use_case import ProcessAudioUseCase
@@ -99,7 +98,7 @@ class StreamlitAdapter:
                         audio_path=Path(audio_path),
                         segments=summary.segments
                     )
-                    components.html(html_content, height=600, scrolling=True)
+                    st.iframe(html_content, height=600)
 
                 st.info(f"저장 위치: {json_path}")
 
@@ -217,7 +216,7 @@ class StreamlitAdapter:
                             audio_path=audio_path,
                             segments=summary.segments
                         )
-                        components.html(html_content, height=600, scrolling=True)
+                        st.iframe(html_content, height=600)
 
                 if summary.timestamp:
                     json_filename = f"{sid}_{ts_str}.json"
