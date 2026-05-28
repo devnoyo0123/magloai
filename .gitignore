@@ -36,6 +36,7 @@ node_modules/
 /.next/
 /out/
 /build
+web/.next/
 *.tsbuildinfo
 next-env.d.ts
 npm-debug.log*
